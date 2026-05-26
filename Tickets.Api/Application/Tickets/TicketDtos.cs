@@ -1,0 +1,66 @@
+using Tickets.Api.Domain.Enums;
+
+namespace Tickets.Api.Application.Tickets;
+
+public record TicketSummaryDto(
+    Guid Id,
+    string Title,
+    TicketStatus Status,
+    TicketPriority Priority,
+    string CustomerName,
+    string? AssignedAgentName,
+    DateTime CreatedAtUtc
+);
+
+public record TicketDetailDto(
+    Guid Id,
+    string Title,
+    string Description,
+    TicketStatus Status,
+    TicketPriority Priority,
+    Guid CustomerId,
+    string CustomerName,
+    Guid? AssignedToUserId,
+    string? AssignedAgentName,
+    DateTime CreatedAtUtc,
+    DateTime? UpdatedAtUtc,
+    DateTime? ResolvedAtUtc,
+    DateTime? ClosedAtUtc,
+    IReadOnlyCollection<TicketCommentDto> Comments
+);
+
+public record TicketCommentDto(
+    Guid Id,
+    Guid AuthorUserId,
+    string AuthorName,
+    string Message,
+    bool IsInternal,
+    DateTime CreatedAtUtc
+);
+
+public record CreateTicketRequest(
+    string Title,
+    string Description,
+    TicketPriority Priority,
+    Guid CustomerId,
+    Guid? AssignedToUserId
+);
+
+public record UpdateTicketRequest(
+    string Title,
+    string Description,
+    TicketStatus Status,
+    TicketPriority Priority,
+    Guid? AssignedToUserId,
+    bool IsActive
+);
+
+public record AddTicketCommentRequest(
+    Guid AuthorUserId,
+    string Message,
+    bool IsInternal
+);
+
+public record ChangeTicketStatusRequest(
+    TicketStatus Status
+);
