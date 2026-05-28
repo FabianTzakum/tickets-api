@@ -52,11 +52,21 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
             query = query.Where(ticket => ticket.AssignedToUserId == queryParameters.AssignedToUserId.Value);
         }
 
-        query = ApplySorting(query, queryParameters.SortBy, queryParameters.SortDirection);
+        var filteredTickets = await query
+            .ToListAsync(cancellationToken);
 
-        var totalItems = await query.CountAsync(cancellationToken);
+        if (queryParameters.IsOverdue.HasValue)
+        {
+            filteredTickets = filteredTickets
+                .Where(ticket => TicketSlaCalculator.IsOverdue(ticket.CreatedAtUtc, ticket.Priority, ticket.Status) == queryParameters.IsOverdue.Value)
+                .ToList();
+        }
 
-        var tickets = await query
+        filteredTickets = ApplySorting(filteredTickets, queryParameters.SortBy, queryParameters.SortDirection);
+
+        var totalItems = filteredTickets.Count;
+
+        var tickets = filteredTickets
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(ticket => new TicketSummaryDto(
@@ -64,11 +74,14 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
                 ticket.Title,
                 ticket.Status,
                 ticket.Priority,
-                ticket.Customer != null ? ticket.Customer.Name : "Cliente no disponible",
-                ticket.AssignedToUser != null ? ticket.AssignedToUser.FullName : null,
-                ticket.CreatedAtUtc
+                ticket.Customer?.Name ?? "Cliente no disponible",
+                ticket.AssignedToUser?.FullName,
+                ticket.CreatedAtUtc,
+                TicketSlaCalculator.GetDueAtUtc(ticket.CreatedAtUtc, ticket.Priority),
+                TicketSlaCalculator.IsOverdue(ticket.CreatedAtUtc, ticket.Priority, ticket.Status),
+                TicketSlaCalculator.RemainingHours(ticket.CreatedAtUtc, ticket.Priority, ticket.Status)
             ))
-            .ToListAsync(cancellationToken);
+            .ToList();
 
         var pagedResponse = PagedResponse<TicketSummaryDto>.Create(tickets, page, pageSize, totalItems);
 
@@ -166,6 +179,14 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
             return ApiResponse<TicketDetailDto>.Fail("No se encontró el ticket solicitado.");
         }
 
+        if (!TicketStateTransitionValidator.CanTransition(ticket.Status, request.Status))
+        {
+            return ApiResponse<TicketDetailDto>.Fail(
+                "La transición de estado no es válida.",
+                [TicketStateTransitionValidator.GetInvalidTransitionMessage(ticket.Status, request.Status)]
+            );
+        }
+
         if (request.AssignedToUserId.HasValue)
         {
             var agentExists = await dbContext.Users
@@ -183,16 +204,16 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
 
         AddHistoryIfChanged(
             ticket.Id,
-            "Priority",
-            ticket.Priority.ToString(),
-            request.Priority.ToString(),
+            "Prioridad",
+            GetPriorityDisplayName(ticket.Priority),
+            GetPriorityDisplayName(request.Priority),
             changedByUserId,
             "Se actualizó la prioridad del ticket."
         );
 
         AddHistoryIfChanged(
             ticket.Id,
-            "AssignedToUserId",
+            "Agente asignado",
             ticket.AssignedToUserId?.ToString(),
             request.AssignedToUserId?.ToString(),
             changedByUserId,
@@ -201,9 +222,9 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
 
         AddHistoryIfChanged(
             ticket.Id,
-            "Status",
-            ticket.Status.ToString(),
-            request.Status.ToString(),
+            "Estado",
+            TicketStateTransitionValidator.GetDisplayName(ticket.Status),
+            TicketStateTransitionValidator.GetDisplayName(request.Status),
             changedByUserId,
             "Se actualizó el estado del ticket."
         );
@@ -283,11 +304,19 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
             return ApiResponse<TicketDetailDto>.Fail("No se encontró el ticket solicitado.");
         }
 
+        if (!TicketStateTransitionValidator.CanTransition(ticket.Status, request.Status))
+        {
+            return ApiResponse<TicketDetailDto>.Fail(
+                "La transición de estado no es válida.",
+                [TicketStateTransitionValidator.GetInvalidTransitionMessage(ticket.Status, request.Status)]
+            );
+        }
+
         AddHistoryIfChanged(
             ticket.Id,
-            "Status",
-            ticket.Status.ToString(),
-            request.Status.ToString(),
+            "Estado",
+            TicketStateTransitionValidator.GetDisplayName(ticket.Status),
+            TicketStateTransitionValidator.GetDisplayName(request.Status),
             changedByUserId,
             "Se actualizó el estado del ticket."
         );
@@ -327,8 +356,8 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
         });
     }
 
-    private static IQueryable<SupportTicket> ApplySorting(
-        IQueryable<SupportTicket> query,
+    private static List<SupportTicket> ApplySorting(
+        List<SupportTicket> tickets,
         string? sortBy,
         string? sortDirection)
     {
@@ -337,20 +366,24 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
         return sortBy?.Trim().ToLowerInvariant() switch
         {
             "title" => descending
-                ? query.OrderByDescending(ticket => ticket.Title)
-                : query.OrderBy(ticket => ticket.Title),
+                ? tickets.OrderByDescending(ticket => ticket.Title).ToList()
+                : tickets.OrderBy(ticket => ticket.Title).ToList(),
 
             "priority" => descending
-                ? query.OrderByDescending(ticket => ticket.Priority)
-                : query.OrderBy(ticket => ticket.Priority),
+                ? tickets.OrderByDescending(ticket => ticket.Priority).ToList()
+                : tickets.OrderBy(ticket => ticket.Priority).ToList(),
 
             "status" => descending
-                ? query.OrderByDescending(ticket => ticket.Status)
-                : query.OrderBy(ticket => ticket.Status),
+                ? tickets.OrderByDescending(ticket => ticket.Status).ToList()
+                : tickets.OrderBy(ticket => ticket.Status).ToList(),
+
+            "sla" => descending
+                ? tickets.OrderByDescending(ticket => TicketSlaCalculator.GetDueAtUtc(ticket.CreatedAtUtc, ticket.Priority)).ToList()
+                : tickets.OrderBy(ticket => TicketSlaCalculator.GetDueAtUtc(ticket.CreatedAtUtc, ticket.Priority)).ToList(),
 
             _ => descending
-                ? query.OrderByDescending(ticket => ticket.CreatedAtUtc)
-                : query.OrderBy(ticket => ticket.CreatedAtUtc)
+                ? tickets.OrderByDescending(ticket => ticket.CreatedAtUtc).ToList()
+                : tickets.OrderBy(ticket => ticket.CreatedAtUtc).ToList()
         };
     }
 
@@ -381,6 +414,10 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
             ticket.UpdatedAtUtc,
             ticket.ResolvedAtUtc,
             ticket.ClosedAtUtc,
+            TicketSlaCalculator.GetDueAtUtc(ticket.CreatedAtUtc, ticket.Priority),
+            TicketSlaCalculator.GetSlaHours(ticket.Priority),
+            TicketSlaCalculator.IsOverdue(ticket.CreatedAtUtc, ticket.Priority, ticket.Status),
+            TicketSlaCalculator.RemainingHours(ticket.CreatedAtUtc, ticket.Priority, ticket.Status),
             ticket.Comments
                 .OrderBy(comment => comment.CreatedAtUtc)
                 .Select(comment => new TicketCommentDto(
@@ -420,6 +457,18 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
         {
             ticket.ClosedAtUtc = DateTime.UtcNow;
         }
+    }
+
+    private static string GetPriorityDisplayName(TicketPriority priority)
+    {
+        return priority switch
+        {
+            TicketPriority.Low => "Baja",
+            TicketPriority.Medium => "Media",
+            TicketPriority.High => "Alta",
+            TicketPriority.Critical => "Crítica",
+            _ => priority.ToString()
+        };
     }
 
     private static List<string> ValidateCreate(CreateTicketRequest request)

@@ -22,7 +22,10 @@ public class UserService(TicketsDbContext dbContext) : IUserService
             ))
             .ToListAsync(cancellationToken);
 
-        return ApiResponse<IReadOnlyCollection<UserSummaryDto>>.Ok(users);
+        return ApiResponse<IReadOnlyCollection<UserSummaryDto>>.Ok(
+            users,
+            "Usuarios obtenidos correctamente."
+        );
     }
 
     public async Task<ApiResponse<UserSummaryDto>> GetByIdAsync(Guid id, CancellationToken cancellationToken)
@@ -33,10 +36,13 @@ public class UserService(TicketsDbContext dbContext) : IUserService
 
         if (user is null)
         {
-            return ApiResponse<UserSummaryDto>.Fail("User was not found.");
+            return ApiResponse<UserSummaryDto>.Fail("No se encontró el usuario solicitado.");
         }
 
-        return ApiResponse<UserSummaryDto>.Ok(MapToSummaryDto(user));
+        return ApiResponse<UserSummaryDto>.Ok(
+            MapToSummaryDto(user),
+            "Usuario obtenido correctamente."
+        );
     }
 
     public async Task<ApiResponse<UserSummaryDto>> CreateAsync(CreateUserRequest request, CancellationToken cancellationToken)
@@ -45,7 +51,7 @@ public class UserService(TicketsDbContext dbContext) : IUserService
 
         if (errors.Count > 0)
         {
-            return ApiResponse<UserSummaryDto>.Fail("User validation failed.", errors);
+            return ApiResponse<UserSummaryDto>.Fail("La validación del usuario falló.", errors);
         }
 
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
@@ -55,7 +61,10 @@ public class UserService(TicketsDbContext dbContext) : IUserService
 
         if (emailExists)
         {
-            return ApiResponse<UserSummaryDto>.Fail("User email already exists.", ["Email must be unique."]);
+            return ApiResponse<UserSummaryDto>.Fail(
+                "El correo del usuario ya existe.",
+                ["El correo debe ser único."]
+            );
         }
 
         var user = new AppUser
@@ -70,7 +79,10 @@ public class UserService(TicketsDbContext dbContext) : IUserService
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return ApiResponse<UserSummaryDto>.Ok(MapToSummaryDto(user), "User created successfully.");
+        return ApiResponse<UserSummaryDto>.Ok(
+            MapToSummaryDto(user),
+            "Usuario creado correctamente."
+        );
     }
 
     public async Task<ApiResponse<UserSummaryDto>> UpdateAsync(Guid id, UpdateUserRequest request, CancellationToken cancellationToken)
@@ -79,7 +91,7 @@ public class UserService(TicketsDbContext dbContext) : IUserService
 
         if (errors.Count > 0)
         {
-            return ApiResponse<UserSummaryDto>.Fail("User validation failed.", errors);
+            return ApiResponse<UserSummaryDto>.Fail("La validación del usuario falló.", errors);
         }
 
         var user = await dbContext.Users
@@ -87,7 +99,7 @@ public class UserService(TicketsDbContext dbContext) : IUserService
 
         if (user is null)
         {
-            return ApiResponse<UserSummaryDto>.Fail("User was not found.");
+            return ApiResponse<UserSummaryDto>.Fail("No se encontró el usuario solicitado.");
         }
 
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
@@ -97,7 +109,10 @@ public class UserService(TicketsDbContext dbContext) : IUserService
 
         if (emailExists)
         {
-            return ApiResponse<UserSummaryDto>.Fail("User email already exists.", ["Email must be unique."]);
+            return ApiResponse<UserSummaryDto>.Fail(
+                "El correo del usuario ya existe.",
+                ["El correo debe ser único."]
+            );
         }
 
         user.FullName = request.FullName.Trim();
@@ -107,7 +122,10 @@ public class UserService(TicketsDbContext dbContext) : IUserService
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return ApiResponse<UserSummaryDto>.Ok(MapToSummaryDto(user), "User updated successfully.");
+        return ApiResponse<UserSummaryDto>.Ok(
+            MapToSummaryDto(user),
+            "Usuario actualizado correctamente."
+        );
     }
 
     private static UserSummaryDto MapToSummaryDto(AppUser user)
@@ -133,12 +151,12 @@ public class UserService(TicketsDbContext dbContext) : IUserService
 
         if (string.IsNullOrWhiteSpace(request.Password))
         {
-            errors.Add("Password is required.");
+            errors.Add("La contraseña es obligatoria.");
         }
 
         if (request.Password.Length < 8)
         {
-            errors.Add("Password must contain at least 8 characters.");
+            errors.Add("La contraseña debe contener al menos 8 caracteres.");
         }
 
         return errors;
@@ -150,22 +168,22 @@ public class UserService(TicketsDbContext dbContext) : IUserService
 
         if (string.IsNullOrWhiteSpace(request.FullName))
         {
-            errors.Add("Full name is required.");
+            errors.Add("El nombre completo es obligatorio.");
         }
 
         if (request.FullName.Length > 160)
         {
-            errors.Add("Full name cannot exceed 160 characters.");
+            errors.Add("El nombre completo no puede exceder 160 caracteres.");
         }
 
         if (string.IsNullOrWhiteSpace(request.Email))
         {
-            errors.Add("Email is required.");
+            errors.Add("El correo es obligatorio.");
         }
 
         if (!request.Email.Contains('@', StringComparison.Ordinal) || request.Email.Length > 180)
         {
-            errors.Add("Email is not valid.");
+            errors.Add("El correo no tiene un formato válido.");
         }
 
         return errors;

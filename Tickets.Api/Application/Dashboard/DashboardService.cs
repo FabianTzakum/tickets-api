@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Tickets.Api.Application.Common;
+using Tickets.Api.Application.Tickets;
 using Tickets.Api.Domain.Enums;
 using Tickets.Api.Infrastructure.Persistence;
 
@@ -17,40 +18,41 @@ public class DashboardService(TicketsDbContext dbContext) : IDashboardService
             .AsNoTracking()
             .CountAsync(cancellationToken);
 
-        var totalTickets = await dbContext.Tickets
+        var tickets = await dbContext.Tickets
             .AsNoTracking()
-            .CountAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
 
-        var openTickets = await CountTicketsByStatusAsync(TicketStatus.Open, cancellationToken);
-        var inProgressTickets = await CountTicketsByStatusAsync(TicketStatus.InProgress, cancellationToken);
-        var waitingClientTickets = await CountTicketsByStatusAsync(TicketStatus.WaitingClient, cancellationToken);
-        var resolvedTickets = await CountTicketsByStatusAsync(TicketStatus.Resolved, cancellationToken);
-        var closedTickets = await CountTicketsByStatusAsync(TicketStatus.Closed, cancellationToken);
+        var totalTickets = tickets.Count;
 
-        var criticalTickets = await CountTicketsByPriorityAsync(TicketPriority.Critical, cancellationToken);
-        var highPriorityTickets = await CountTicketsByPriorityAsync(TicketPriority.High, cancellationToken);
+        var openTickets = CountTicketsByStatus(tickets, TicketStatus.Open);
+        var inProgressTickets = CountTicketsByStatus(tickets, TicketStatus.InProgress);
+        var waitingClientTickets = CountTicketsByStatus(tickets, TicketStatus.WaitingClient);
+        var resolvedTickets = CountTicketsByStatus(tickets, TicketStatus.Resolved);
+        var closedTickets = CountTicketsByStatus(tickets, TicketStatus.Closed);
 
-        var unassignedTickets = await dbContext.Tickets
-            .AsNoTracking()
-            .CountAsync(ticket => ticket.AssignedToUserId == null, cancellationToken);
+        var criticalTickets = CountTicketsByPriority(tickets, TicketPriority.Critical);
+        var highPriorityTickets = CountTicketsByPriority(tickets, TicketPriority.High);
 
-        var ticketsByStatus = await dbContext.Tickets
-            .AsNoTracking()
+        var unassignedTickets = tickets.Count(ticket => ticket.AssignedToUserId == null);
+
+        var overdueTickets = tickets.Count(ticket =>
+            TicketSlaCalculator.IsOverdue(ticket.CreatedAtUtc, ticket.Priority, ticket.Status));
+
+        var ticketsByStatus = tickets
             .GroupBy(ticket => ticket.Status)
             .Select(group => new TicketStatusMetricDto(
                 group.Key.ToString(),
                 group.Count()
             ))
-            .ToListAsync(cancellationToken);
+            .ToList();
 
-        var ticketsByPriority = await dbContext.Tickets
-            .AsNoTracking()
+        var ticketsByPriority = tickets
             .GroupBy(ticket => ticket.Priority)
             .Select(group => new TicketPriorityMetricDto(
                 group.Key.ToString(),
                 group.Count()
             ))
-            .ToListAsync(cancellationToken);
+            .ToList();
 
         var summary = new DashboardSummaryDto(
             totalCustomers,
@@ -64,6 +66,7 @@ public class DashboardService(TicketsDbContext dbContext) : IDashboardService
             criticalTickets,
             highPriorityTickets,
             unassignedTickets,
+            overdueTickets,
             ticketsByStatus,
             ticketsByPriority
         );
@@ -71,17 +74,13 @@ public class DashboardService(TicketsDbContext dbContext) : IDashboardService
         return ApiResponse<DashboardSummaryDto>.Ok(summary, "Resumen del dashboard obtenido correctamente.");
     }
 
-    private Task<int> CountTicketsByStatusAsync(TicketStatus status, CancellationToken cancellationToken)
+    private static int CountTicketsByStatus(IReadOnlyCollection<Domain.Entities.SupportTicket> tickets, TicketStatus status)
     {
-        return dbContext.Tickets
-            .AsNoTracking()
-            .CountAsync(ticket => ticket.Status == status, cancellationToken);
+        return tickets.Count(ticket => ticket.Status == status);
     }
 
-    private Task<int> CountTicketsByPriorityAsync(TicketPriority priority, CancellationToken cancellationToken)
+    private static int CountTicketsByPriority(IReadOnlyCollection<Domain.Entities.SupportTicket> tickets, TicketPriority priority)
     {
-        return dbContext.Tickets
-            .AsNoTracking()
-            .CountAsync(ticket => ticket.Priority == priority, cancellationToken);
+        return tickets.Count(ticket => ticket.Priority == priority);
     }
 }

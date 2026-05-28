@@ -23,7 +23,10 @@ public class CustomerService(TicketsDbContext dbContext) : ICustomerService
             ))
             .ToListAsync(cancellationToken);
 
-        return ApiResponse<IReadOnlyCollection<CustomerSummaryDto>>.Ok(customers);
+        return ApiResponse<IReadOnlyCollection<CustomerSummaryDto>>.Ok(
+            customers,
+            "Clientes obtenidos correctamente."
+        );
     }
 
     public async Task<ApiResponse<CustomerDetailDto>> GetByIdAsync(Guid id, CancellationToken cancellationToken)
@@ -34,10 +37,13 @@ public class CustomerService(TicketsDbContext dbContext) : ICustomerService
 
         if (customer is null)
         {
-            return ApiResponse<CustomerDetailDto>.Fail("Customer was not found.");
+            return ApiResponse<CustomerDetailDto>.Fail("No se encontró el cliente solicitado.");
         }
 
-        return ApiResponse<CustomerDetailDto>.Ok(MapToDetailDto(customer));
+        return ApiResponse<CustomerDetailDto>.Ok(
+            MapToDetailDto(customer),
+            "Cliente obtenido correctamente."
+        );
     }
 
     public async Task<ApiResponse<CustomerDetailDto>> CreateAsync(CreateCustomerRequest request, CancellationToken cancellationToken)
@@ -46,21 +52,26 @@ public class CustomerService(TicketsDbContext dbContext) : ICustomerService
 
         if (errors.Count > 0)
         {
-            return ApiResponse<CustomerDetailDto>.Fail("Customer validation failed.", errors);
+            return ApiResponse<CustomerDetailDto>.Fail("La validación del cliente falló.", errors);
         }
 
+        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+
         var emailExists = await dbContext.Customers
-            .AnyAsync(customer => customer.Email == request.Email, cancellationToken);
+            .AnyAsync(customer => customer.Email == normalizedEmail, cancellationToken);
 
         if (emailExists)
         {
-            return ApiResponse<CustomerDetailDto>.Fail("Customer email already exists.", ["Email must be unique."]);
+            return ApiResponse<CustomerDetailDto>.Fail(
+                "El correo del cliente ya existe.",
+                ["El correo debe ser único."]
+            );
         }
 
         var customer = new Customer
         {
             Name = request.Name.Trim(),
-            Email = request.Email.Trim().ToLowerInvariant(),
+            Email = normalizedEmail,
             Phone = NormalizeNullable(request.Phone),
             CompanyName = NormalizeNullable(request.CompanyName),
             Notes = NormalizeNullable(request.Notes)
@@ -70,7 +81,10 @@ public class CustomerService(TicketsDbContext dbContext) : ICustomerService
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return ApiResponse<CustomerDetailDto>.Ok(MapToDetailDto(customer), "Customer created successfully.");
+        return ApiResponse<CustomerDetailDto>.Ok(
+            MapToDetailDto(customer),
+            "Cliente creado correctamente."
+        );
     }
 
     public async Task<ApiResponse<CustomerDetailDto>> UpdateAsync(Guid id, UpdateCustomerRequest request, CancellationToken cancellationToken)
@@ -79,7 +93,7 @@ public class CustomerService(TicketsDbContext dbContext) : ICustomerService
 
         if (errors.Count > 0)
         {
-            return ApiResponse<CustomerDetailDto>.Fail("Customer validation failed.", errors);
+            return ApiResponse<CustomerDetailDto>.Fail("La validación del cliente falló.", errors);
         }
 
         var customer = await dbContext.Customers
@@ -87,7 +101,7 @@ public class CustomerService(TicketsDbContext dbContext) : ICustomerService
 
         if (customer is null)
         {
-            return ApiResponse<CustomerDetailDto>.Fail("Customer was not found.");
+            return ApiResponse<CustomerDetailDto>.Fail("No se encontró el cliente solicitado.");
         }
 
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
@@ -97,7 +111,10 @@ public class CustomerService(TicketsDbContext dbContext) : ICustomerService
 
         if (emailExists)
         {
-            return ApiResponse<CustomerDetailDto>.Fail("Customer email already exists.", ["Email must be unique."]);
+            return ApiResponse<CustomerDetailDto>.Fail(
+                "El correo del cliente ya existe.",
+                ["El correo debe ser único."]
+            );
         }
 
         customer.Name = request.Name.Trim();
@@ -109,7 +126,10 @@ public class CustomerService(TicketsDbContext dbContext) : ICustomerService
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return ApiResponse<CustomerDetailDto>.Ok(MapToDetailDto(customer), "Customer updated successfully.");
+        return ApiResponse<CustomerDetailDto>.Ok(
+            MapToDetailDto(customer),
+            "Cliente actualizado correctamente."
+        );
     }
 
     private static CustomerDetailDto MapToDetailDto(Customer customer)
@@ -133,22 +153,22 @@ public class CustomerService(TicketsDbContext dbContext) : ICustomerService
 
         if (string.IsNullOrWhiteSpace(name))
         {
-            errors.Add("Name is required.");
+            errors.Add("El nombre es obligatorio.");
         }
 
         if (name.Length > 160)
         {
-            errors.Add("Name cannot exceed 160 characters.");
+            errors.Add("El nombre no puede exceder 160 caracteres.");
         }
 
         if (string.IsNullOrWhiteSpace(email))
         {
-            errors.Add("Email is required.");
+            errors.Add("El correo es obligatorio.");
         }
 
         if (!email.Contains('@', StringComparison.Ordinal) || email.Length > 180)
         {
-            errors.Add("Email is not valid.");
+            errors.Add("El correo no tiene un formato válido.");
         }
 
         return errors;

@@ -10,6 +10,7 @@ public record TicketQueryParameters(
     TicketPriority? Priority = null,
     Guid? CustomerId = null,
     Guid? AssignedToUserId = null,
+    bool? IsOverdue = null,
     string? SortBy = "createdAt",
     string? SortDirection = "desc"
 );
@@ -21,7 +22,10 @@ public record TicketSummaryDto(
     TicketPriority Priority,
     string CustomerName,
     string? AssignedAgentName,
-    DateTime CreatedAtUtc
+    DateTime CreatedAtUtc,
+    DateTime SlaDueAtUtc,
+    bool IsOverdue,
+    double RemainingSlaHours
 );
 
 public record TicketDetailDto(
@@ -38,6 +42,10 @@ public record TicketDetailDto(
     DateTime? UpdatedAtUtc,
     DateTime? ResolvedAtUtc,
     DateTime? ClosedAtUtc,
+    DateTime SlaDueAtUtc,
+    int SlaHours,
+    bool IsOverdue,
+    double RemainingSlaHours,
     IReadOnlyCollection<TicketCommentDto> Comments,
     IReadOnlyCollection<TicketHistoryDto> History
 );

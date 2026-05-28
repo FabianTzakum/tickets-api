@@ -33,6 +33,36 @@ Tickets API simula un sistema interno de soporte donde administradores y agentes
 - Respuestas API estructuradas.
 - Swagger configurado para pruebas.
 
+## Usuario demo
+
+El sistema crea datos demo automáticamente al iniciar si la base de datos está vacía.
+
+Email: admin@tickets.local
+Password: Admin12345
+Rol: Admin
+
+También se crea un agente demo:
+
+Email: agent@tickets.local
+Password: Agent12345
+Rol: SupportAgent
+Flujo básico de prueba
+
+## Iniciar sesión
+POST /api/auth/login
+
+Body:
+
+{
+  "email": "admin@tickets.local",
+  "password": "Admin12345"
+}
+
+## Autorizar Swagger
+
+Copiar el accessToken, presionar Authorize y pegar el token.
+
+
 ## Roles disponibles
 
 | Rol | Valor | Descripción |

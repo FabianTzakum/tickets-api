@@ -12,6 +12,7 @@ public record DashboardSummaryDto(
     int CriticalTickets,
     int HighPriorityTickets,
     int UnassignedTickets,
+    int OverdueTickets,
     IReadOnlyCollection<TicketStatusMetricDto> TicketsByStatus,
     IReadOnlyCollection<TicketPriorityMetricDto> TicketsByPriority
 );
