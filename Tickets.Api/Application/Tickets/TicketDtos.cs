@@ -2,6 +2,18 @@ using Tickets.Api.Domain.Enums;
 
 namespace Tickets.Api.Application.Tickets;
 
+public record TicketQueryParameters(
+    int Page = 1,
+    int PageSize = 10,
+    string? Search = null,
+    TicketStatus? Status = null,
+    TicketPriority? Priority = null,
+    Guid? CustomerId = null,
+    Guid? AssignedToUserId = null,
+    string? SortBy = "createdAt",
+    string? SortDirection = "desc"
+);
+
 public record TicketSummaryDto(
     Guid Id,
     string Title,

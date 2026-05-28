@@ -4,7 +4,9 @@ namespace Tickets.Api.Application.Tickets;
 
 public interface ITicketService
 {
-    Task<ApiResponse<IReadOnlyCollection<TicketSummaryDto>>> GetAllAsync(CancellationToken cancellationToken);
+    Task<ApiResponse<PagedResponse<TicketSummaryDto>>> GetAllAsync(
+        TicketQueryParameters queryParameters,
+        CancellationToken cancellationToken);
 
     Task<ApiResponse<TicketDetailDto>> GetByIdAsync(Guid id, CancellationToken cancellationToken);
 

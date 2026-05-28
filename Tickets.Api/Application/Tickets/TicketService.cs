@@ -8,25 +8,74 @@ namespace Tickets.Api.Application.Tickets;
 
 public class TicketService(TicketsDbContext dbContext) : ITicketService
 {
-    public async Task<ApiResponse<IReadOnlyCollection<TicketSummaryDto>>> GetAllAsync(CancellationToken cancellationToken)
+    public async Task<ApiResponse<PagedResponse<TicketSummaryDto>>> GetAllAsync(
+        TicketQueryParameters queryParameters,
+        CancellationToken cancellationToken)
     {
-        var tickets = await dbContext.Tickets
+        var page = Math.Max(queryParameters.Page, 1);
+        var pageSize = Math.Clamp(queryParameters.PageSize, 1, 50);
+
+        var query = dbContext.Tickets
             .AsNoTracking()
             .Include(ticket => ticket.Customer)
             .Include(ticket => ticket.AssignedToUser)
-            .OrderByDescending(ticket => ticket.CreatedAtUtc)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(queryParameters.Search))
+        {
+            var search = queryParameters.Search.Trim();
+
+            query = query.Where(ticket =>
+                ticket.Title.Contains(search) ||
+                ticket.Description.Contains(search) ||
+                (ticket.Customer != null && ticket.Customer.Name.Contains(search)) ||
+                (ticket.AssignedToUser != null && ticket.AssignedToUser.FullName.Contains(search)));
+        }
+
+        if (queryParameters.Status.HasValue)
+        {
+            query = query.Where(ticket => ticket.Status == queryParameters.Status.Value);
+        }
+
+        if (queryParameters.Priority.HasValue)
+        {
+            query = query.Where(ticket => ticket.Priority == queryParameters.Priority.Value);
+        }
+
+        if (queryParameters.CustomerId.HasValue)
+        {
+            query = query.Where(ticket => ticket.CustomerId == queryParameters.CustomerId.Value);
+        }
+
+        if (queryParameters.AssignedToUserId.HasValue)
+        {
+            query = query.Where(ticket => ticket.AssignedToUserId == queryParameters.AssignedToUserId.Value);
+        }
+
+        query = ApplySorting(query, queryParameters.SortBy, queryParameters.SortDirection);
+
+        var totalItems = await query.CountAsync(cancellationToken);
+
+        var tickets = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(ticket => new TicketSummaryDto(
                 ticket.Id,
                 ticket.Title,
                 ticket.Status,
                 ticket.Priority,
-                ticket.Customer != null ? ticket.Customer.Name : "Unknown customer",
+                ticket.Customer != null ? ticket.Customer.Name : "Cliente no disponible",
                 ticket.AssignedToUser != null ? ticket.AssignedToUser.FullName : null,
                 ticket.CreatedAtUtc
             ))
             .ToListAsync(cancellationToken);
 
-        return ApiResponse<IReadOnlyCollection<TicketSummaryDto>>.Ok(tickets);
+        var pagedResponse = PagedResponse<TicketSummaryDto>.Create(tickets, page, pageSize, totalItems);
+
+        return ApiResponse<PagedResponse<TicketSummaryDto>>.Ok(
+            pagedResponse,
+            "Tickets obtenidos correctamente."
+        );
     }
 
     public async Task<ApiResponse<TicketDetailDto>> GetByIdAsync(Guid id, CancellationToken cancellationToken)
@@ -37,10 +86,10 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
 
         if (ticket is null)
         {
-            return ApiResponse<TicketDetailDto>.Fail("Ticket was not found.");
+            return ApiResponse<TicketDetailDto>.Fail("No se encontró el ticket solicitado.");
         }
 
-        return ApiResponse<TicketDetailDto>.Ok(MapToDetailDto(ticket));
+        return ApiResponse<TicketDetailDto>.Ok(MapToDetailDto(ticket), "Ticket obtenido correctamente.");
     }
 
     public async Task<ApiResponse<TicketDetailDto>> CreateAsync(CreateTicketRequest request, CancellationToken cancellationToken)
@@ -49,7 +98,7 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
 
         if (errors.Count > 0)
         {
-            return ApiResponse<TicketDetailDto>.Fail("Ticket validation failed.", errors);
+            return ApiResponse<TicketDetailDto>.Fail("La validación del ticket falló.", errors);
         }
 
         var customerExists = await dbContext.Customers
@@ -57,7 +106,7 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
 
         if (!customerExists)
         {
-            return ApiResponse<TicketDetailDto>.Fail("Customer was not found or is inactive.");
+            return ApiResponse<TicketDetailDto>.Fail("El cliente no existe o está inactivo.");
         }
 
         if (request.AssignedToUserId.HasValue)
@@ -71,7 +120,7 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
 
             if (!agentExists)
             {
-                return ApiResponse<TicketDetailDto>.Fail("Assigned user must be an active admin or support agent.");
+                return ApiResponse<TicketDetailDto>.Fail("El usuario asignado debe ser un administrador o agente activo.");
             }
         }
 
@@ -93,7 +142,7 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
             .AsNoTracking()
             .FirstAsync(item => item.Id == ticket.Id, cancellationToken);
 
-        return ApiResponse<TicketDetailDto>.Ok(MapToDetailDto(createdTicket), "Ticket created successfully.");
+        return ApiResponse<TicketDetailDto>.Ok(MapToDetailDto(createdTicket), "Ticket creado correctamente.");
     }
 
     public async Task<ApiResponse<TicketDetailDto>> UpdateAsync(Guid id, UpdateTicketRequest request, CancellationToken cancellationToken)
@@ -102,7 +151,7 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
 
         if (errors.Count > 0)
         {
-            return ApiResponse<TicketDetailDto>.Fail("Ticket validation failed.", errors);
+            return ApiResponse<TicketDetailDto>.Fail("La validación del ticket falló.", errors);
         }
 
         var ticket = await dbContext.Tickets
@@ -110,7 +159,7 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
 
         if (ticket is null)
         {
-            return ApiResponse<TicketDetailDto>.Fail("Ticket was not found.");
+            return ApiResponse<TicketDetailDto>.Fail("No se encontró el ticket solicitado.");
         }
 
         if (request.AssignedToUserId.HasValue)
@@ -124,7 +173,7 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
 
             if (!agentExists)
             {
-                return ApiResponse<TicketDetailDto>.Fail("Assigned user must be an active admin or support agent.");
+                return ApiResponse<TicketDetailDto>.Fail("El usuario asignado debe ser un administrador o agente activo.");
             }
         }
 
@@ -142,7 +191,7 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
             .AsNoTracking()
             .FirstAsync(item => item.Id == id, cancellationToken);
 
-        return ApiResponse<TicketDetailDto>.Ok(MapToDetailDto(updatedTicket), "Ticket updated successfully.");
+        return ApiResponse<TicketDetailDto>.Ok(MapToDetailDto(updatedTicket), "Ticket actualizado correctamente.");
     }
 
     public async Task<ApiResponse<TicketDetailDto>> AddCommentAsync(Guid ticketId, AddTicketCommentRequest request, CancellationToken cancellationToken)
@@ -151,7 +200,7 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
 
         if (errors.Count > 0)
         {
-            return ApiResponse<TicketDetailDto>.Fail("Comment validation failed.", errors);
+            return ApiResponse<TicketDetailDto>.Fail("La validación del comentario falló.", errors);
         }
 
         var ticketExists = await dbContext.Tickets
@@ -159,7 +208,7 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
 
         if (!ticketExists)
         {
-            return ApiResponse<TicketDetailDto>.Fail("Ticket was not found.");
+            return ApiResponse<TicketDetailDto>.Fail("No se encontró el ticket solicitado.");
         }
 
         var authorExists = await dbContext.Users
@@ -167,7 +216,7 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
 
         if (!authorExists)
         {
-            return ApiResponse<TicketDetailDto>.Fail("Author user was not found or is inactive.");
+            return ApiResponse<TicketDetailDto>.Fail("El usuario autor no existe o está inactivo.");
         }
 
         var comment = new TicketComment
@@ -186,7 +235,7 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
             .AsNoTracking()
             .FirstAsync(item => item.Id == ticketId, cancellationToken);
 
-        return ApiResponse<TicketDetailDto>.Ok(MapToDetailDto(updatedTicket), "Comment added successfully.");
+        return ApiResponse<TicketDetailDto>.Ok(MapToDetailDto(updatedTicket), "Comentario agregado correctamente.");
     }
 
     public async Task<ApiResponse<TicketDetailDto>> ChangeStatusAsync(Guid ticketId, ChangeTicketStatusRequest request, CancellationToken cancellationToken)
@@ -196,7 +245,7 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
 
         if (ticket is null)
         {
-            return ApiResponse<TicketDetailDto>.Fail("Ticket was not found.");
+            return ApiResponse<TicketDetailDto>.Fail("No se encontró el ticket solicitado.");
         }
 
         ApplyStatus(ticket, request.Status);
@@ -207,7 +256,34 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
             .AsNoTracking()
             .FirstAsync(item => item.Id == ticketId, cancellationToken);
 
-        return ApiResponse<TicketDetailDto>.Ok(MapToDetailDto(updatedTicket), "Ticket status updated successfully.");
+        return ApiResponse<TicketDetailDto>.Ok(MapToDetailDto(updatedTicket), "Estado del ticket actualizado correctamente.");
+    }
+
+    private static IQueryable<SupportTicket> ApplySorting(
+        IQueryable<SupportTicket> query,
+        string? sortBy,
+        string? sortDirection)
+    {
+        var descending = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase);
+
+        return sortBy?.Trim().ToLowerInvariant() switch
+        {
+            "title" => descending
+                ? query.OrderByDescending(ticket => ticket.Title)
+                : query.OrderBy(ticket => ticket.Title),
+
+            "priority" => descending
+                ? query.OrderByDescending(ticket => ticket.Priority)
+                : query.OrderBy(ticket => ticket.Priority),
+
+            "status" => descending
+                ? query.OrderByDescending(ticket => ticket.Status)
+                : query.OrderBy(ticket => ticket.Status),
+
+            _ => descending
+                ? query.OrderByDescending(ticket => ticket.CreatedAtUtc)
+                : query.OrderBy(ticket => ticket.CreatedAtUtc)
+        };
     }
 
     private IQueryable<SupportTicket> GetTicketQuery()
@@ -228,7 +304,7 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
             ticket.Status,
             ticket.Priority,
             ticket.CustomerId,
-            ticket.Customer?.Name ?? "Unknown customer",
+            ticket.Customer?.Name ?? "Cliente no disponible",
             ticket.AssignedToUserId,
             ticket.AssignedToUser?.FullName,
             ticket.CreatedAtUtc,
@@ -240,7 +316,7 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
                 .Select(comment => new TicketCommentDto(
                     comment.Id,
                     comment.AuthorUserId,
-                    comment.AuthorUser?.FullName ?? "Unknown user",
+                    comment.AuthorUser?.FullName ?? "Usuario no disponible",
                     comment.Message,
                     comment.IsInternal,
                     comment.CreatedAtUtc
@@ -268,12 +344,12 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
     {
         var errors = new List<string>();
 
-        ValidateText(request.Title, "Title", 180, errors);
-        ValidateText(request.Description, "Description", 3000, errors);
+        ValidateText(request.Title, "El título", 180, errors);
+        ValidateText(request.Description, "La descripción", 3000, errors);
 
         if (request.CustomerId == Guid.Empty)
         {
-            errors.Add("CustomerId is required.");
+            errors.Add("El cliente es obligatorio.");
         }
 
         return errors;
@@ -283,8 +359,8 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
     {
         var errors = new List<string>();
 
-        ValidateText(request.Title, "Title", 180, errors);
-        ValidateText(request.Description, "Description", 3000, errors);
+        ValidateText(request.Title, "El título", 180, errors);
+        ValidateText(request.Description, "La descripción", 3000, errors);
 
         return errors;
     }
@@ -295,10 +371,10 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
 
         if (request.AuthorUserId == Guid.Empty)
         {
-            errors.Add("AuthorUserId is required.");
+            errors.Add("El usuario autor es obligatorio.");
         }
 
-        ValidateText(request.Message, "Message", 2000, errors);
+        ValidateText(request.Message, "El mensaje", 2000, errors);
 
         return errors;
     }
@@ -307,13 +383,13 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            errors.Add($"{fieldName} is required.");
+            errors.Add($"{fieldName} es obligatorio.");
             return;
         }
 
         if (value.Length > maxLength)
         {
-            errors.Add($"{fieldName} cannot exceed {maxLength} characters.");
+            errors.Add($"{fieldName} no puede exceder {maxLength} caracteres.");
         }
     }
 }

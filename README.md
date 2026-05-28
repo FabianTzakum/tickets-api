@@ -2,7 +2,6 @@
 
 API REST profesional construida con ASP.NET Core para la gestión de tickets de soporte técnico.
 
-Este proyecto fue creado como parte de un portafolio backend orientado a demostrar habilidades reales con .NET, C#, SQL Server, Entity Framework Core, autenticación JWT, roles, Swagger y arquitectura organizada por capas.
 
 ## Objetivo del proyecto
 

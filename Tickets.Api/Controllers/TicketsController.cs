@@ -11,10 +11,12 @@ namespace Tickets.Api.Controllers;
 public class TicketsController(ITicketService ticketService) : ControllerBase
 {
     [HttpGet]
-    [ProducesResponseType(typeof(ApiResponse<IReadOnlyCollection<TicketSummaryDto>>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<TicketSummaryDto>>>> GetAll(CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(ApiResponse<PagedResponse<TicketSummaryDto>>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ApiResponse<PagedResponse<TicketSummaryDto>>>> GetAll(
+        [FromQuery] TicketQueryParameters queryParameters,
+        CancellationToken cancellationToken)
     {
-        var response = await ticketService.GetAllAsync(cancellationToken);
+        var response = await ticketService.GetAllAsync(queryParameters, cancellationToken);
 
         return Ok(response);
     }
@@ -64,7 +66,7 @@ public class TicketsController(ITicketService ticketService) : ControllerBase
 
         if (!response.Success)
         {
-            if (response.Message.Contains("not found", StringComparison.OrdinalIgnoreCase))
+            if (response.Message.Contains("no se encontró", StringComparison.OrdinalIgnoreCase))
             {
                 return NotFound(response);
             }
@@ -88,7 +90,7 @@ public class TicketsController(ITicketService ticketService) : ControllerBase
 
         if (!response.Success)
         {
-            if (response.Message.Contains("not found", StringComparison.OrdinalIgnoreCase))
+            if (response.Message.Contains("no se encontró", StringComparison.OrdinalIgnoreCase))
             {
                 return NotFound(response);
             }
