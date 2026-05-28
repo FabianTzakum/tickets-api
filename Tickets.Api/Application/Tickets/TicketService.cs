@@ -145,7 +145,11 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
         return ApiResponse<TicketDetailDto>.Ok(MapToDetailDto(createdTicket), "Ticket creado correctamente.");
     }
 
-    public async Task<ApiResponse<TicketDetailDto>> UpdateAsync(Guid id, UpdateTicketRequest request, CancellationToken cancellationToken)
+    public async Task<ApiResponse<TicketDetailDto>> UpdateAsync(
+        Guid id,
+        UpdateTicketRequest request,
+        Guid? changedByUserId,
+        CancellationToken cancellationToken)
     {
         var errors = ValidateUpdate(request);
 
@@ -176,6 +180,33 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
                 return ApiResponse<TicketDetailDto>.Fail("El usuario asignado debe ser un administrador o agente activo.");
             }
         }
+
+        AddHistoryIfChanged(
+            ticket.Id,
+            "Priority",
+            ticket.Priority.ToString(),
+            request.Priority.ToString(),
+            changedByUserId,
+            "Se actualizó la prioridad del ticket."
+        );
+
+        AddHistoryIfChanged(
+            ticket.Id,
+            "AssignedToUserId",
+            ticket.AssignedToUserId?.ToString(),
+            request.AssignedToUserId?.ToString(),
+            changedByUserId,
+            "Se actualizó el agente asignado al ticket."
+        );
+
+        AddHistoryIfChanged(
+            ticket.Id,
+            "Status",
+            ticket.Status.ToString(),
+            request.Status.ToString(),
+            changedByUserId,
+            "Se actualizó el estado del ticket."
+        );
 
         ticket.Title = request.Title.Trim();
         ticket.Description = request.Description.Trim();
@@ -238,7 +269,11 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
         return ApiResponse<TicketDetailDto>.Ok(MapToDetailDto(updatedTicket), "Comentario agregado correctamente.");
     }
 
-    public async Task<ApiResponse<TicketDetailDto>> ChangeStatusAsync(Guid ticketId, ChangeTicketStatusRequest request, CancellationToken cancellationToken)
+    public async Task<ApiResponse<TicketDetailDto>> ChangeStatusAsync(
+        Guid ticketId,
+        ChangeTicketStatusRequest request,
+        Guid? changedByUserId,
+        CancellationToken cancellationToken)
     {
         var ticket = await dbContext.Tickets
             .FirstOrDefaultAsync(item => item.Id == ticketId, cancellationToken);
@@ -247,6 +282,15 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
         {
             return ApiResponse<TicketDetailDto>.Fail("No se encontró el ticket solicitado.");
         }
+
+        AddHistoryIfChanged(
+            ticket.Id,
+            "Status",
+            ticket.Status.ToString(),
+            request.Status.ToString(),
+            changedByUserId,
+            "Se actualizó el estado del ticket."
+        );
 
         ApplyStatus(ticket, request.Status);
 
@@ -257,6 +301,30 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
             .FirstAsync(item => item.Id == ticketId, cancellationToken);
 
         return ApiResponse<TicketDetailDto>.Ok(MapToDetailDto(updatedTicket), "Estado del ticket actualizado correctamente.");
+    }
+
+    private void AddHistoryIfChanged(
+        Guid ticketId,
+        string fieldName,
+        string? oldValue,
+        string? newValue,
+        Guid? changedByUserId,
+        string description)
+    {
+        if (string.Equals(oldValue, newValue, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        dbContext.TicketHistory.Add(new TicketHistory
+        {
+            TicketId = ticketId,
+            FieldName = fieldName,
+            OldValue = oldValue,
+            NewValue = newValue,
+            ChangedByUserId = changedByUserId,
+            Description = description
+        });
     }
 
     private static IQueryable<SupportTicket> ApplySorting(
@@ -292,7 +360,9 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
             .Include(ticket => ticket.Customer)
             .Include(ticket => ticket.AssignedToUser)
             .Include(ticket => ticket.Comments)
-            .ThenInclude(comment => comment.AuthorUser);
+            .ThenInclude(comment => comment.AuthorUser)
+            .Include(ticket => ticket.History)
+            .ThenInclude(history => history.ChangedByUser);
     }
 
     private static TicketDetailDto MapToDetailDto(SupportTicket ticket)
@@ -320,6 +390,18 @@ public class TicketService(TicketsDbContext dbContext) : ITicketService
                     comment.Message,
                     comment.IsInternal,
                     comment.CreatedAtUtc
+                ))
+                .ToList(),
+            ticket.History
+                .OrderByDescending(history => history.CreatedAtUtc)
+                .Select(history => new TicketHistoryDto(
+                    history.Id,
+                    history.FieldName,
+                    history.OldValue,
+                    history.NewValue,
+                    history.ChangedByUser?.FullName,
+                    history.Description,
+                    history.CreatedAtUtc
                 ))
                 .ToList()
         );

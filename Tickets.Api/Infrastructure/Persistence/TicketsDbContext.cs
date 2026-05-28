@@ -13,6 +13,8 @@ public class TicketsDbContext(DbContextOptions<TicketsDbContext> options) : DbCo
 
     public DbSet<TicketComment> TicketComments => Set<TicketComment>();
 
+    public DbSet<TicketHistory> TicketHistory => Set<TicketHistory>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

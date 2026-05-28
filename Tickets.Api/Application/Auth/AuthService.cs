@@ -42,6 +42,36 @@ public class AuthService(TicketsDbContext dbContext, IConfiguration configuratio
         return ApiResponse<LoginResponse>.Ok(response, "Inicio de sesión completado correctamente.");
     }
 
+    public async Task<ApiResponse<AuthUserDto>> GetCurrentUserAsync(
+        ClaimsPrincipal userPrincipal,
+        CancellationToken cancellationToken)
+    {
+        var userIdValue = userPrincipal.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(userIdValue) || !Guid.TryParse(userIdValue, out var userId))
+        {
+            return ApiResponse<AuthUserDto>.Fail("No se pudo identificar al usuario autenticado.");
+        }
+
+        var user = await dbContext.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(item => item.Id == userId && item.IsActive, cancellationToken);
+
+        if (user is null)
+        {
+            return ApiResponse<AuthUserDto>.Fail("El usuario autenticado no existe o está inactivo.");
+        }
+
+        var response = new AuthUserDto(
+            user.Id,
+            user.FullName,
+            user.Email,
+            user.Role
+        );
+
+        return ApiResponse<AuthUserDto>.Ok(response, "Usuario autenticado obtenido correctamente.");
+    }
+
     private string CreateToken(Guid userId, string fullName, string email, string role, DateTime expiresAtUtc)
     {
         var secretKey = configuration["Jwt:SecretKey"]

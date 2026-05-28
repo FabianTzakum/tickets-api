@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Tickets.Api.Application.Common;
@@ -62,7 +63,7 @@ public class TicketsController(ITicketService ticketService) : ControllerBase
         UpdateTicketRequest request,
         CancellationToken cancellationToken)
     {
-        var response = await ticketService.UpdateAsync(id, request, cancellationToken);
+        var response = await ticketService.UpdateAsync(id, request, GetCurrentUserId(), cancellationToken);
 
         if (!response.Success)
         {
@@ -109,7 +110,7 @@ public class TicketsController(ITicketService ticketService) : ControllerBase
         ChangeTicketStatusRequest request,
         CancellationToken cancellationToken)
     {
-        var response = await ticketService.ChangeStatusAsync(id, request, cancellationToken);
+        var response = await ticketService.ChangeStatusAsync(id, request, GetCurrentUserId(), cancellationToken);
 
         if (!response.Success)
         {
@@ -117,5 +118,17 @@ public class TicketsController(ITicketService ticketService) : ControllerBase
         }
 
         return Ok(response);
+    }
+
+    private Guid? GetCurrentUserId()
+    {
+        var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (Guid.TryParse(userIdValue, out var userId))
+        {
+            return userId;
+        }
+
+        return null;
     }
 }

@@ -12,9 +12,17 @@ public interface ITicketService
 
     Task<ApiResponse<TicketDetailDto>> CreateAsync(CreateTicketRequest request, CancellationToken cancellationToken);
 
-    Task<ApiResponse<TicketDetailDto>> UpdateAsync(Guid id, UpdateTicketRequest request, CancellationToken cancellationToken);
+    Task<ApiResponse<TicketDetailDto>> UpdateAsync(
+        Guid id,
+        UpdateTicketRequest request,
+        Guid? changedByUserId,
+        CancellationToken cancellationToken);
 
     Task<ApiResponse<TicketDetailDto>> AddCommentAsync(Guid ticketId, AddTicketCommentRequest request, CancellationToken cancellationToken);
 
-    Task<ApiResponse<TicketDetailDto>> ChangeStatusAsync(Guid ticketId, ChangeTicketStatusRequest request, CancellationToken cancellationToken);
+    Task<ApiResponse<TicketDetailDto>> ChangeStatusAsync(
+        Guid ticketId,
+        ChangeTicketStatusRequest request,
+        Guid? changedByUserId,
+        CancellationToken cancellationToken);
 }

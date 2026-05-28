@@ -38,7 +38,8 @@ public record TicketDetailDto(
     DateTime? UpdatedAtUtc,
     DateTime? ResolvedAtUtc,
     DateTime? ClosedAtUtc,
-    IReadOnlyCollection<TicketCommentDto> Comments
+    IReadOnlyCollection<TicketCommentDto> Comments,
+    IReadOnlyCollection<TicketHistoryDto> History
 );
 
 public record TicketCommentDto(
@@ -47,6 +48,16 @@ public record TicketCommentDto(
     string AuthorName,
     string Message,
     bool IsInternal,
+    DateTime CreatedAtUtc
+);
+
+public record TicketHistoryDto(
+    Guid Id,
+    string FieldName,
+    string? OldValue,
+    string? NewValue,
+    string? ChangedByName,
+    string Description,
     DateTime CreatedAtUtc
 );
 

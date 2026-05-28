@@ -26,4 +26,6 @@ public class SupportTicket : AuditableEntity
     public DateTime? ClosedAtUtc { get; set; }
 
     public ICollection<TicketComment> Comments { get; set; } = [];
+
+    public ICollection<TicketHistory> History { get; set; } = [];
 }
