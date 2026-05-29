@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { reactive } from "vue";
+import { reactive, ref } from "vue";
 import { useRouter } from "vue-router";
+import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from "lucide-vue-next";
 import { useAuthStore } from "@/stores/authStore";
 
 const router = useRouter();
 const authStore = useAuthStore();
+const showPassword = ref(false);
 
 const form = reactive({
   email: "admin@tickets.local",
@@ -25,44 +27,78 @@ async function handleSubmit() {
 
 <template>
   <main class="login-page">
-    <section class="login-page__panel">
-      <div class="login-page__content">
-        <span class="login-page__badge">Tickets API</span>
-        <h1>Panel de soporte técnico</h1>
-        <p>
-          Interfaz Vue conectada a una API ASP.NET Core con JWT, roles,
-          dashboard operativo, tickets, SLA e historial de cambios.
-        </p>
-      </div>
+    <section class="login-shell">
+      <aside class="login-shell__visual">
+        <div class="login-shell__glow"></div>
 
-      <form class="login-card" @submit.prevent="handleSubmit">
-        <div>
-          <p class="login-card__eyebrow">Acceso seguro</p>
+        <div class="login-shell__symbol">
+          <span></span>
+          <span></span>
+        </div>
+
+        <div class="login-shell__copy">
+          <h1>Ticket App</h1>
+          <p>Soporte. Tickets. Soluciones.</p>
+        </div>
+
+        <div class="login-shell__wave"></div>
+      </aside>
+
+      <form class="login-form" @submit.prevent="handleSubmit">
+        <div class="login-form__header">
+          <p class="section-label">
+            <ShieldCheck :size="16" />
+            Acceso seguro
+          </p>
           <h2>Iniciar sesión</h2>
         </div>
 
-        <label class="field">
+        <label class="form-field">
           <span>Correo</span>
-          <input v-model="form.email" type="email" autocomplete="email" />
+          <div class="input-control">
+            <Mail class="input-control__icon" :size="20" />
+            <input v-model="form.email" type="email" autocomplete="email" placeholder="ejemplo@correo.com" />
+          </div>
         </label>
 
-        <label class="field">
+        <label class="form-field">
           <span>Contraseña</span>
-          <input v-model="form.password" type="password" autocomplete="current-password" />
+          <div class="input-control">
+            <LockKeyhole class="input-control__icon" :size="20" />
+            <input
+              v-model="form.password"
+              :type="showPassword ? 'text' : 'password'"
+              autocomplete="current-password"
+              placeholder="••••••••"
+            />
+            <button class="input-control__action" type="button" @click="showPassword = !showPassword">
+              <EyeOff v-if="showPassword" :size="19" />
+              <Eye v-else :size="19" />
+            </button>
+          </div>
         </label>
+
+        <a class="login-form__link" href="#" aria-label="Recuperar contraseña">
+          ¿Olvidaste tu contraseña?
+        </a>
 
         <p v-if="authStore.errorMessage" class="form-error">
           {{ authStore.errorMessage }}
         </p>
 
-        <button class="button button--primary" type="submit" :disabled="authStore.isLoading">
-          {{ authStore.isLoading ? "Entrando..." : "Entrar al panel" }}
+        <button class="button button--primary button--block" type="submit" :disabled="authStore.isLoading">
+          {{ authStore.isLoading ? "Validando..." : "Entrar" }}
         </button>
 
-        <div class="login-card__demo">
-          <strong>Usuario demo</strong>
-          <span>admin@tickets.local / Admin12345</span>
+        <div class="login-form__divider">
+          <span></span>
+          <strong>o</strong>
+          <span></span>
         </div>
+
+        <p class="login-form__support">
+          ¿Necesitas ayuda? Contacta a <strong>soporte</strong>.
+        </p>
       </form>
     </section>
   </main>

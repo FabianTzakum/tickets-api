@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from "vue-router";
 import { useAuthStore } from "@/stores/authStore";
 import LoginView from "@/views/LoginView.vue";
 import DashboardView from "@/views/DashboardView.vue";
+import TicketsView from "@/views/TicketsView.vue";
+import TicketDetailView from "@/views/TicketDetailView.vue";
 
 const router = createRouter({
   history: createWebHistory(),
@@ -10,9 +12,7 @@ const router = createRouter({
       path: "/login",
       name: "login",
       component: LoginView,
-      meta: {
-        public: true
-      }
+      meta: { public: true }
     },
     {
       path: "/",
@@ -22,8 +22,23 @@ const router = createRouter({
           path: "",
           name: "dashboard",
           component: DashboardView
+        },
+        {
+          path: "tickets",
+          name: "tickets",
+          component: TicketsView
+        },
+        {
+          path: "tickets/:id",
+          name: "ticket-detail",
+          component: TicketDetailView,
+          props: true
         }
       ]
+    },
+    {
+      path: "/:pathMatch(.*)*",
+      redirect: { name: "dashboard" }
     }
   ]
 });
@@ -36,15 +51,11 @@ router.beforeEach(async (to) => {
   }
 
   if (!to.meta.public && !authStore.isAuthenticated) {
-    return {
-      name: "login"
-    };
+    return { name: "login" };
   }
 
   if (to.name === "login" && authStore.isAuthenticated) {
-    return {
-      name: "dashboard"
-    };
+    return { name: "dashboard" };
   }
 
   return true;
