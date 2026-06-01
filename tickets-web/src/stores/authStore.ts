@@ -47,6 +47,7 @@ export const useAuthStore = defineStore("auth", {
 
   getters: {
     isAuthenticated: (state) => Boolean(state.token && state.user),
+
     userRoleLabel: (state) => {
       if (!state.user) {
         return "Sin sesión";
@@ -58,7 +59,7 @@ export const useAuthStore = defineStore("auth", {
         3: "Cliente"
       };
 
-      return labels[state.user.role];
+      return labels[state.user.role] ?? "Usuario";
     }
   },
 
@@ -89,7 +90,10 @@ export const useAuthStore = defineStore("auth", {
       this.errorMessage = null;
 
       try {
-        const response = await apiClient.post<ApiResponse<LoginResponse>>("/api/auth/login", payload);
+        const response = await apiClient.post<ApiResponse<LoginResponse>>("/api/auth/login", {
+          email: payload.email.trim(),
+          password: payload.password
+        });
 
         if (!response.data.success || !response.data.data) {
           this.errorMessage = response.data.message || "No se pudo iniciar sesión.";
@@ -113,6 +117,7 @@ export const useAuthStore = defineStore("auth", {
     logout() {
       this.token = null;
       this.user = null;
+      this.errorMessage = null;
       localStorage.removeItem("tickets_api_token");
     }
   }

@@ -4,6 +4,8 @@ import LoginView from "@/views/LoginView.vue";
 import DashboardView from "@/views/DashboardView.vue";
 import TicketsView from "@/views/TicketsView.vue";
 import TicketDetailView from "@/views/TicketDetailView.vue";
+import CustomersView from "@/views/CustomersView.vue";
+import UsersView from "@/views/UsersView.vue";
 
 const router = createRouter({
   history: createWebHistory(),
@@ -18,22 +20,11 @@ const router = createRouter({
       path: "/",
       component: () => import("@/layouts/AppLayout.vue"),
       children: [
-        {
-          path: "",
-          name: "dashboard",
-          component: DashboardView
-        },
-        {
-          path: "tickets",
-          name: "tickets",
-          component: TicketsView
-        },
-        {
-          path: "tickets/:id",
-          name: "ticket-detail",
-          component: TicketDetailView,
-          props: true
-        }
+        { path: "", name: "dashboard", component: DashboardView },
+        { path: "tickets", name: "tickets", component: TicketsView },
+        { path: "tickets/:id", name: "ticket-detail", component: TicketDetailView, props: true },
+        { path: "clientes", name: "customers", component: CustomersView },
+        { path: "usuarios", name: "users", component: UsersView }
       ]
     },
     {

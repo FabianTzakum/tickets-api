@@ -39,10 +39,10 @@ const isUserMenuOpen = ref(false);
 const navigationItems: NavigationItem[] = [
   { label: "Dashboard", routeName: "dashboard", icon: Gauge, enabled: true },
   { label: "Tickets", routeName: "tickets", icon: Ticket, enabled: true },
-  { label: "Clientes", routeName: "customers", icon: UsersRound, enabled: false, badge: "Pronto" },
-  { label: "Usuarios", routeName: "users", icon: UserRound, enabled: false, badge: "Pronto" },
-  { label: "Reportes", routeName: "reports", icon: BarChart3, enabled: false, badge: "Pronto" },
-  { label: "Configuración", routeName: "settings", icon: Settings, enabled: false, badge: "Pronto" }
+  { label: "Clientes", routeName: "customers", icon: UsersRound, enabled: true },
+  { label: "Usuarios", routeName: "users", icon: UserRound, enabled: true },
+  // { label: "Reportes", routeName: "reports", icon: BarChart3, enabled: false, badge: "Pronto" },
+  // { label: "Configuración", routeName: "settings", icon: Settings, enabled: false, badge: "Pronto" }
 ];
 
 const activeNavigationLabel = computed(() => {
@@ -56,9 +56,7 @@ const shellClasses = computed(() => ({
 }));
 
 function getInitials(name?: string) {
-  if (!name) {
-    return "A";
-  }
+  if (!name) return "A";
 
   return name
     .split(" ")
